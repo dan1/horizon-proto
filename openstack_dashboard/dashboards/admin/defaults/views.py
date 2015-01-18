@@ -17,6 +17,7 @@ from django.utils.translation import ugettext_lazy as _
 from horizon import tabs
 from horizon import workflows
 
+from openstack_dashboard import api
 from openstack_dashboard.dashboards.admin.defaults import tabs as project_tabs
 from openstack_dashboard.dashboards.admin.defaults import workflows as \
     project_workflows
@@ -36,13 +37,15 @@ class UpdateDefaultQuotasView(workflows.WorkflowView):
         initial = super(UpdateDefaultQuotasView, self).get_initial()
 
         # get initial quota defaults
-        try:
-            quota_defaults = quotas.get_default_quota_data(self.request)
-            for field in (quotas.QUOTA_FIELDS + quotas.MISSING_QUOTA_FIELDS):
-                initial[field] = quota_defaults.get(field).limit
+        if api.keystone.is_cloud_admin(self.request):
+            try:
+                quota_defaults = quotas.get_default_quota_data(self.request)
+                for field in (quotas.QUOTA_FIELDS +
+                              quotas.MISSING_QUOTA_FIELDS):
+                    initial[field] = quota_defaults.get(field).limit
 
-        except Exception:
-            error_msg = _('Unable to retrieve default quota values.')
-            self.add_error_to_step(error_msg, 'update_default_quotas')
+            except Exception:
+                error_msg = _('Unable to retrieve default quota values.')
+                self.add_error_to_step(error_msg, 'update_default_quotas')
 
         return initial

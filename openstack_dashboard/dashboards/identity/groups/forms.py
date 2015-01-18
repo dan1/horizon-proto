@@ -22,7 +22,6 @@ from horizon import messages
 
 from openstack_dashboard import api
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -36,10 +35,13 @@ class CreateGroupForm(forms.SelfHandlingForm):
     def handle(self, request, data):
         try:
             LOG.info('Creating group with name "%s"' % data['name'])
-            domain_context = request.session.get('domain_context', None)
+
+            domain = api.keystone.get_default_domain(self.request)
+            domain_id = domain.get('id')
+
             api.keystone.group_create(
                 request,
-                domain_id=domain_context,
+                domain_id=domain_id,
                 name=data['name'],
                 description=data['description'])
             messages.success(request,

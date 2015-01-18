@@ -31,13 +31,16 @@ class NetworkTests(test.BaseAdminViewTests):
     @test.create_stubs({api.neutron: ('network_list',
                                       'list_dhcp_agent_hosting_networks',
                                       'is_extension_supported'),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_index(self):
         tenants = self.tenants.list()
         api.neutron.network_list(IsA(http.HttpRequest)) \
             .AndReturn(self.networks.list())
-        api.keystone.tenant_list(IsA(http.HttpRequest))\
-            .AndReturn([tenants, False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         for network in self.networks.list():
             api.neutron.list_dhcp_agent_hosting_networks(IsA(http.HttpRequest),
                                                          network.id)\
@@ -259,13 +262,16 @@ class NetworkTests(test.BaseAdminViewTests):
 
     @test.create_stubs({api.neutron: ('profile_list',
                                       'list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_network_create_get(self,
                                 test_with_profile=False):
         tenants = self.tenants.list()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(
-            http.HttpRequest)).AndReturn([tenants, False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         if test_with_profile:
             net_profiles = self.net_profiles.list()
             api.neutron.profile_list(IsA(http.HttpRequest),
@@ -287,15 +293,18 @@ class NetworkTests(test.BaseAdminViewTests):
     @test.create_stubs({api.neutron: ('network_create',
                                       'profile_list',
                                       'list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_network_create_post(self,
                                  test_with_profile=False):
         tenants = self.tenants.list()
         tenant_id = self.tenants.first().id
         network = self.networks.first()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(http.HttpRequest))\
-            .AndReturn([tenants, False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         params = {'name': network.name,
                   'tenant_id': tenant_id,
                   'admin_state_up': network.admin_state_up,
@@ -336,15 +345,18 @@ class NetworkTests(test.BaseAdminViewTests):
     @test.create_stubs({api.neutron: ('network_create',
                                       'profile_list',
                                       'list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_network_create_post_network_exception(self,
                                                    test_with_profile=False):
         tenants = self.tenants.list()
         tenant_id = self.tenants.first().id
         network = self.networks.first()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn([tenants,
-                                                                   False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         params = {'name': network.name,
                   'tenant_id': tenant_id,
                   'admin_state_up': network.admin_state_up,
@@ -384,14 +396,17 @@ class NetworkTests(test.BaseAdminViewTests):
             test_with_profile=True)
 
     @test.create_stubs({api.neutron: ('list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_network_create_vlan_segmentation_id_invalid(self):
         tenants = self.tenants.list()
         tenant_id = self.tenants.first().id
         network = self.networks.first()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn([tenants,
-                                                                   False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         api.neutron.list_extensions(
             IsA(http.HttpRequest)).AndReturn(extensions)
         self.mox.ReplayAll()
@@ -411,14 +426,17 @@ class NetworkTests(test.BaseAdminViewTests):
         self.assertContains(res, "1 through 4094")
 
     @test.create_stubs({api.neutron: ('list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_network_create_gre_segmentation_id_invalid(self):
         tenants = self.tenants.list()
         tenant_id = self.tenants.first().id
         network = self.networks.first()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn([tenants,
-                                                                   False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         api.neutron.list_extensions(
             IsA(http.HttpRequest)).AndReturn(extensions)
         self.mox.ReplayAll()
@@ -438,7 +456,8 @@ class NetworkTests(test.BaseAdminViewTests):
         self.assertContains(res, "0 through %s" % ((2 ** 32) - 1))
 
     @test.create_stubs({api.neutron: ('list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     @test.update_settings(
         OPENSTACK_NEUTRON_NETWORK={
             'segmentation_id_range': {'vxlan': [10, 20]}})
@@ -447,8 +466,10 @@ class NetworkTests(test.BaseAdminViewTests):
         tenant_id = self.tenants.first().id
         network = self.networks.first()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn([tenants,
-                                                                   False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         api.neutron.list_extensions(
             IsA(http.HttpRequest)).AndReturn(extensions)
         self.mox.ReplayAll()
@@ -468,15 +489,18 @@ class NetworkTests(test.BaseAdminViewTests):
         self.assertContains(res, "10 through 20")
 
     @test.create_stubs({api.neutron: ('list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     @test.update_settings(
         OPENSTACK_NEUTRON_NETWORK={
             'supported_provider_types': []})
     def test_network_create_no_provider_types(self):
         tenants = self.tenants.list()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn([tenants,
-                                                                   False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         api.neutron.list_extensions(
             IsA(http.HttpRequest)).AndReturn(extensions)
         self.mox.ReplayAll()
@@ -491,15 +515,18 @@ class NetworkTests(test.BaseAdminViewTests):
             html=True)
 
     @test.create_stubs({api.neutron: ('list_extensions',),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     @test.update_settings(
         OPENSTACK_NEUTRON_NETWORK={
             'supported_provider_types': ['local', 'flat', 'gre']})
     def test_network_create_unsupported_provider_types(self):
         tenants = self.tenants.list()
         extensions = self.api_extensions.list()
-        api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn([tenants,
-                                                                   False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         api.neutron.list_extensions(
             IsA(http.HttpRequest)).AndReturn(extensions)
         self.mox.ReplayAll()
@@ -596,7 +623,8 @@ class NetworkTests(test.BaseAdminViewTests):
                                       'network_delete',
                                       'list_dhcp_agent_hosting_networks',
                                       'is_extension_supported'),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_delete_network(self):
         tenants = self.tenants.list()
         network = self.networks.first()
@@ -609,8 +637,10 @@ class NetworkTests(test.BaseAdminViewTests):
         api.neutron.is_extension_supported(
             IsA(http.HttpRequest),
             'dhcp_agent_scheduler').AndReturn(True)
-        api.keystone.tenant_list(IsA(http.HttpRequest))\
-            .AndReturn([tenants, False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         api.neutron.network_list(IsA(http.HttpRequest))\
             .AndReturn([network])
         api.neutron.network_delete(IsA(http.HttpRequest), network.id)
@@ -626,7 +656,8 @@ class NetworkTests(test.BaseAdminViewTests):
                                       'network_delete',
                                       'list_dhcp_agent_hosting_networks',
                                       'is_extension_supported'),
-                        api.keystone: ('tenant_list',)})
+                        api.keystone: ('tenant_list',
+                                       'get_effective_domain_id')})
     def test_delete_network_exception(self):
         tenants = self.tenants.list()
         network = self.networks.first()
@@ -639,8 +670,10 @@ class NetworkTests(test.BaseAdminViewTests):
         api.neutron.is_extension_supported(
             IsA(http.HttpRequest),
             'dhcp_agent_scheduler').AndReturn(True)
-        api.keystone.tenant_list(IsA(http.HttpRequest))\
-            .AndReturn([tenants, False])
+
+        api.keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([tenants, False])
+
         api.neutron.network_list(IsA(http.HttpRequest))\
             .AndReturn([network])
         api.neutron.network_delete(IsA(http.HttpRequest), network.id)\

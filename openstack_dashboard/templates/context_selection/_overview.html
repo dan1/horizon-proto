@@ -4,7 +4,9 @@
     <span>{{ domain_name }}</span>
     <strong>&middot;</strong>
     {% endif %}
+    {% if project_name %}
     <span>{{ project_name }}</span>
+    {% endif %}
     {% if multi_region %}
     <strong>&middot;</strong>
     <span>{{ region_name }}</span>

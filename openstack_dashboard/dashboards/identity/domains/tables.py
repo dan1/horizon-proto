@@ -156,8 +156,8 @@ class SetDomainContext(tables.Action):
         if not multidomain_support:
             return False
 
-        ctx = request.session.get("domain_context", None)
-        if ctx and datum.id == ctx:
+        domain_context = request.session.get("domain_context")
+        if domain_context and datum.id == domain_context:
             return False
         return True
 
@@ -185,8 +185,12 @@ class UnsetDomainContext(tables.Action):
     policy_rules = (('identity', 'admin_required'),)
 
     def allowed(self, request, datum):
-        ctx = request.session.get("domain_context", None)
-        return ctx is not None
+        domain_context = request.session.get('domain_context')
+        if domain_context is None:
+            return False
+
+        domain_id = api.keystone.get_default_domain(request).get('id')
+        return domain_id is not None
 
     def single(self, table, request, obj_id):
         if 'domain_context' in request.session:

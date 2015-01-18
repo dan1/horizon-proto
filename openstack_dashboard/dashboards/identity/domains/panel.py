@@ -26,6 +26,5 @@ class Domains(horizon.Panel):
     policy_rules = (("identity", "identity:get_domain"),
                     ("identity", "identity:list_domains"))
 
-
 if keystone.VERSIONS.active >= 3:
     dashboard.Identity.register(Domains)

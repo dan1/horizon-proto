@@ -31,6 +31,9 @@ def get_user_home(user):
     if dashboard is None:
         dashboard = horizon.get_default_dashboard()
 
+    if user.token.project.get('id') is None:
+        dashboard = horizon.get_dashboard('identity')
+
     return dashboard.get_absolute_url()
 
 

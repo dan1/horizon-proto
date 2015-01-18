@@ -25,6 +25,13 @@ class Roles(horizon.Panel):
     slug = 'roles'
     policy_rules = (("identity", "identity:list_roles"),)
 
+    def can_access(self, context):
+        if keystone.VERSIONS.active < 3:
+            return super(Roles, self).can_access(context)
+
+        request = context['request']
+        domain_token = request.session.get('domain_token')
+        return super(Roles, self).can_access(context) and domain_token
 
 if keystone.VERSIONS.active >= 3:
     dashboard.Identity.register(Roles)

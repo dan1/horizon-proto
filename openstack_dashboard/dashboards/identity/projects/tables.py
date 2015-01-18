@@ -64,6 +64,13 @@ class UpdateMembersLink(tables.LinkAction):
         param = urlencode({"step": step})
         return "?".join([base_url, param])
 
+    def allowed(self, request, project):
+        if api.keystone.VERSIONS.active < 3:
+            return True
+        else:
+            domain_token = request.session.get('domain_token')
+            return domain_token is not None
+
 
 class UpdateGroupsLink(tables.LinkAction):
     name = "groups"
@@ -74,7 +81,11 @@ class UpdateGroupsLink(tables.LinkAction):
     policy_rules = (("identity", "identity:list_groups"),)
 
     def allowed(self, request, project):
-        return api.keystone.VERSIONS.active >= 3
+        if api.keystone.VERSIONS.active >= 3:
+            domain_token = request.session.get('domain_token')
+            return domain_token is not None
+        else:
+            return False
 
     def get_link_url(self, project):
         step = 'update_group_members'
@@ -103,7 +114,11 @@ class CreateProject(tables.LinkAction):
     policy_rules = (('identity', 'identity:create_project'),)
 
     def allowed(self, request, project):
-        return api.keystone.keystone_can_edit_project()
+        if api.keystone.VERSIONS.active < 3:
+            return api.keystone.keystone_can_edit_project()
+        else:
+            domain_token = request.session.get('domain_token')
+            return api.keystone.keystone_can_edit_project() and domain_token
 
 
 class UpdateProject(tables.LinkAction):
@@ -115,7 +130,11 @@ class UpdateProject(tables.LinkAction):
     policy_rules = (('identity', 'identity:update_project'),)
 
     def allowed(self, request, project):
-        return api.keystone.keystone_can_edit_project()
+        if api.keystone.VERSIONS.active < 3:
+            return api.keystone.keystone_can_edit_project()
+        else:
+            domain_token = request.session.get('domain_token')
+            return api.keystone.keystone_can_edit_project() and domain_token
 
 
 class ModifyQuotas(tables.LinkAction):
@@ -131,6 +150,13 @@ class ModifyQuotas(tables.LinkAction):
         base_url = reverse(self.url, args=[project.id])
         param = urlencode({"step": step})
         return "?".join([base_url, param])
+
+    def allowed(self, request, datum):
+        if api.keystone.VERSIONS.active < 3:
+            return True
+        else:
+            domain_token = request.session.get('domain_token')
+            return domain_token is not None
 
 
 class DeleteTenantsAction(tables.DeleteAction):
@@ -153,7 +179,11 @@ class DeleteTenantsAction(tables.DeleteAction):
     policy_rules = (("identity", "identity:delete_project"),)
 
     def allowed(self, request, project):
-        return api.keystone.keystone_can_edit_project()
+        if api.keystone.VERSIONS.active < 3:
+            return api.keystone.keystone_can_edit_project()
+        else:
+            domain_token = request.session.get('domain_token')
+            return api.keystone.keystone_can_edit_project() and domain_token
 
     def delete(self, request, obj_id):
         api.keystone.tenant_delete(request, obj_id)
@@ -240,6 +270,17 @@ class TenantsTable(tables.DataTable):
                                 label=_('Enabled'),
                                 required=False),
                             update_action=UpdateCell)
+
+    if api.keystone.VERSIONS.active <= 3:
+        domain_name = tables.Column(
+            'domain_name', verbose_name=_('Domain Name'))
+        enabled = tables.Column('enabled', verbose_name=_('Enabled'),
+                                status=True,
+                                filters=(filters.yesno, filters.capfirst),
+                                form_field=forms.BooleanField(
+                                    label=_('Enabled'),
+                                    required=False),
+                                update_action=UpdateCell)
 
     class Meta(object):
         name = "tenants"

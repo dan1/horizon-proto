@@ -10,6 +10,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import operator
+
 from django.utils.datastructures import SortedDict
 from django.utils.translation import ugettext_lazy as _
 
@@ -18,7 +20,6 @@ from horizon import tabs
 
 from openstack_dashboard import api
 from openstack_dashboard.api import cinder
-from openstack_dashboard.api import keystone
 
 from openstack_dashboard.dashboards.admin.volumes.snapshots \
     import tables as snapshots_tables
@@ -38,16 +39,17 @@ class VolumeTab(tabs.TableTab, volumes_tabs.VolumeTableMixIn):
     preload = False
 
     def get_volumes_data(self):
-        volumes = self._get_volumes(search_opts={'all_tenants': True})
-        instances = self._get_instances(search_opts={'all_tenants': True})
+        search_opts = {'all_tenants': True}
+        volumes = self._get_volumes(search_opts=search_opts)
+        instances = self._get_instances(search_opts=search_opts)
         volume_ids_with_snapshots = self._get_volumes_ids_with_snapshots(
-            search_opts={'all_tenants': True})
+            search_opts=search_opts)
         self._set_volume_attributes(
             volumes, instances, volume_ids_with_snapshots)
 
         # Gather our tenants to correlate against IDs
         try:
-            tenants, has_more = keystone.tenant_list(self.request)
+            tenants, has_more = api.keystone.tenant_list(self.request)
         except Exception:
             tenants = []
             msg = _('Unable to retrieve volume project information.')
@@ -130,12 +132,12 @@ class SnapshotTab(tabs.TableTab):
             except Exception:
                 snapshots = []
                 volumes = {}
-                exceptions.handle(self.request, _("Unable to retrieve "
-                                                  "volume snapshots."))
+                exceptions.handle(self.request,
+                                  _("Unable to retrieve volume snapshots."))
 
             # Gather our tenants to correlate against volume IDs
             try:
-                tenants, has_more = keystone.tenant_list(self.request)
+                tenants, has_more = api.keystone.tenant_list(self.request)
             except Exception:
                 tenants = []
                 msg = _('Unable to retrieve volume project information.')
@@ -154,7 +156,7 @@ class SnapshotTab(tabs.TableTab):
 
         else:
             snapshots = []
-        return sorted(snapshots, key=lambda snapshot: snapshot.tenant_name)
+        return sorted(snapshots, key=operator.attrgetter('tenant_name'))
 
 
 class VolumesGroupTabs(tabs.TabGroup):

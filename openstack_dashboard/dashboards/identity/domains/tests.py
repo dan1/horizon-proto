@@ -310,10 +310,10 @@ class UpdateDomainWorkflowTests(test.BaseAdminViewTests):
 
         # handle
         api.keystone.domain_update(IsA(http.HttpRequest),
+                                   domain.id,
+                                   name=domain.name,
                                    description=test_description,
-                                   domain_id=domain.id,
-                                   enabled=domain.enabled,
-                                   name=domain.name).AndReturn(None)
+                                   enabled=domain.enabled).AndReturn(None)
 
         api.keystone.user_list(IsA(http.HttpRequest),
                                domain=domain.id).AndReturn(users)
@@ -475,10 +475,10 @@ class UpdateDomainWorkflowTests(test.BaseAdminViewTests):
 
         # handle
         api.keystone.domain_update(IsA(http.HttpRequest),
+                                   domain.id,
+                                   name=domain.name,
                                    description=test_description,
-                                   domain_id=domain.id,
-                                   enabled=domain.enabled,
-                                   name=domain.name) \
+                                   enabled=domain.enabled) \
             .AndRaise(self.exceptions.keystone)
 
         self.mox.ReplayAll()

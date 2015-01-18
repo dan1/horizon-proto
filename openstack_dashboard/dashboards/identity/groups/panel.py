@@ -25,6 +25,5 @@ class Groups(horizon.Panel):
     slug = 'groups'
     policy_rules = (("identity", "identity:list_groups"),)
 
-
 if keystone.VERSIONS.active >= 3:
     dashboard.Identity.register(Groups)

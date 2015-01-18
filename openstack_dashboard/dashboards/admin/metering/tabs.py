@@ -11,6 +11,7 @@
 # under the License.
 
 
+from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext_lazy as _
 
 from horizon import exceptions
@@ -86,8 +87,10 @@ class UsageReportTab(tabs.TableTab):
                                                                  date_to,
                                                                  3600 * 24)
         except Exception:
+            redirect = reverse("horizon:admin:overview:index")
             exceptions.handle(self.request,
-                              _('Unable to retrieve project list.'))
+                              _('Unable to retrieve project list.'),
+                              redirect=redirect)
         for meter in meters._cached_meters.values():
             service = None
             for name, m_list in services.items():

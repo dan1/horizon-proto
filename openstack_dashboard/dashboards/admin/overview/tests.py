@@ -41,6 +41,7 @@ class UsageViewTests(test.BaseAdminViewTests):
         self.mox.StubOutWithMock(api.nova, 'usage_list')
         self.mox.StubOutWithMock(api.nova, 'tenant_absolute_limits')
         self.mox.StubOutWithMock(api.nova, 'extension_supported')
+        self.mox.StubOutWithMock(api.keystone, 'get_effective_domain_id')
         self.mox.StubOutWithMock(api.keystone, 'tenant_list')
         self.mox.StubOutWithMock(api.neutron, 'is_extension_supported')
         self.mox.StubOutWithMock(api.network, 'floating_ip_supported')
@@ -69,11 +70,11 @@ class UsageViewTests(test.BaseAdminViewTests):
         now = timezone.now()
         usage_list = [api.nova.NovaUsage(u) for u in self.usages.list()]
         if tenant_deleted:
-            api.keystone.tenant_list(IsA(http.HttpRequest)) \
-                .AndReturn([[self.tenants.first()], False])
+            api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn(
+                [[self.tenants.first()], False])
         else:
-            api.keystone.tenant_list(IsA(http.HttpRequest)) \
-                .AndReturn([self.tenants.list(), False])
+            api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn(
+                [self.tenants.list(), False])
 
         if nova_stu_enabled:
             api.nova.usage_list(IsA(http.HttpRequest),
@@ -163,8 +164,10 @@ class UsageViewTests(test.BaseAdminViewTests):
             .AndReturn(nova_stu_enabled)
         now = timezone.now()
         usage_obj = [api.nova.NovaUsage(u) for u in self.usages.list()]
-        api.keystone.tenant_list(IsA(http.HttpRequest)) \
-                    .AndReturn([self.tenants.list(), False])
+
+        api.keystone.tenant_list(IsA(http.HttpRequest)).AndReturn(
+            [self.tenants.list(), False])
+
         if nova_stu_enabled:
             api.nova.usage_list(IsA(http.HttpRequest),
                                 datetime.datetime(now.year,

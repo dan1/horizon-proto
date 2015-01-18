@@ -29,5 +29,4 @@ class Tenants(horizon.Panel):
     policy_rules = (("identity", "identity:list_projects"),
                     ("identity", "identity:list_user_projects"))
 
-
 dashboard.Identity.register(Tenants)

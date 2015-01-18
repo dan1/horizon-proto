@@ -39,6 +39,7 @@ from openstack_dashboard import policy
 
 LOG = logging.getLogger(__name__)
 DEFAULT_ROLE = None
+DEFAULT_DOMAIN = getattr(settings, 'OPENSTACK_KEYSTONE_DEFAULT_DOMAIN', None)
 
 
 # Set up our data structure for managing Identity API versions, and
@@ -120,7 +121,7 @@ def _get_endpoint_url(request, endpoint_type, catalog=None):
     return url
 
 
-def keystoneclient(request, admin=False):
+def keystoneclient(request, admin=False, use_project_token=False):
     """Returns a client connected to the Keystone backend.
 
     Several forms of authentication are supported:
@@ -142,7 +143,15 @@ def keystoneclient(request, admin=False):
     The client is cached so that subsequent API calls during the same
     request/response cycle don't have to be re-authenticated.
     """
+    api_version = VERSIONS.get_active_version()
     user = request.user
+    token_id = user.token.id
+
+    if api_version >= 3 and not use_project_token:
+        domain_token = request.session.get('domain_token')
+        if domain_token:
+            token_id = getattr(domain_token, 'auth_token', None)
+
     if admin:
         if not policy.check((("identity", "admin_required"),), request):
             raise exceptions.NotAuthorized
@@ -152,15 +161,13 @@ def keystoneclient(request, admin=False):
                                 'OPENSTACK_ENDPOINT_TYPE',
                                 'internalURL')
 
-    api_version = VERSIONS.get_active_version()
-
     # Take care of client connection caching/fetching a new client.
     # Admin vs. non-admin clients are cached separately for token matching.
     cache_attr = "_keystoneclient_admin" if admin \
         else backend.KEYSTONE_CLIENT_ATTR
     if (hasattr(request, cache_attr) and
-        (not user.token.id or
-         getattr(request, cache_attr).auth_token == user.token.id)):
+        (not token_id or
+         getattr(request, cache_attr).auth_token == token_id)):
         conn = getattr(request, cache_attr)
     else:
         endpoint = _get_endpoint_url(request, endpoint_type)
@@ -168,14 +175,13 @@ def keystoneclient(request, admin=False):
         cacert = getattr(settings, 'OPENSTACK_SSL_CACERT', None)
         LOG.debug("Creating a new keystoneclient connection to %s." % endpoint)
         remote_addr = request.environ.get('REMOTE_ADDR', '')
-        conn = api_version['client'].Client(token=user.token.id,
+        conn = api_version['client'].Client(token=token_id,
                                             endpoint=endpoint,
                                             original_ip=remote_addr,
                                             insecure=insecure,
                                             cacert=cacert,
                                             auth_url=endpoint,
                                             debug=settings.DEBUG)
-        setattr(request, cache_attr, conn)
     return conn
 
 
@@ -201,10 +207,29 @@ def domain_list(request):
     return manager.list()
 
 
+def domain_lookup(request):
+    if policy.check((("identity", "identity:list_domains"),), request):
+        try:
+            domains = domain_list(request)
+            return dict((d.id, d.name) for d in domains)
+        except Exception:
+            LOG.warn("Pure project admin doesn't have a domain token")
+            return None
+    else:
+        domain = get_default_domain(request)
+        return {domain.id: domain.name}
+
+
 def domain_update(request, domain_id, name=None, description=None,
                   enabled=None):
     manager = keystoneclient(request, admin=True).domains
-    return manager.update(domain_id, name, description, enabled)
+    try:
+        response = manager.update(domain_id, name=name,
+                                  description=description, enabled=enabled)
+    except Exception as e:
+        LOG.exception("Unable to update Domain: %s" % domain_id)
+        raise e
+    return response
 
 
 def tenant_create(request, name, description=None, enabled=None,
@@ -226,18 +251,43 @@ def get_default_domain(request):
     """
     domain_id = request.session.get("domain_context", None)
     domain_name = request.session.get("domain_context_name", None)
+
     # if running in Keystone V3 or later
-    if VERSIONS.active >= 3 and not domain_id:
+    if VERSIONS.active >= 3 and domain_id is None:
         # if no domain context set, default to users' domain
         domain_id = request.user.user_domain_id
+        domain_name = request.user.user_domain_name
         try:
             domain = domain_get(request, domain_id)
             domain_name = domain.name
+
         except Exception:
             LOG.warning("Unable to retrieve Domain: %s" % domain_id)
+
     domain = base.APIDictWrapper({"id": domain_id,
                                   "name": domain_name})
     return domain
+
+
+def get_effective_domain_id(request):
+    """Gets the id of the default domain to use when creating Identity objects.
+    If the requests default domain is the same as DEFAULT_DOMAIN, return None.
+
+    Many keystone calls need this type of behavior to deal with hierarchical
+    domain structures.
+    """
+
+    # TODO(woodm1979): This assumes there's one-level of sub-domains with a
+    # single super-domain to rule them all.  A different solution will be
+    # needed once the whole hierarchical domains + hierarchical projects
+    # picture shakes out.
+
+    domain_id = get_default_domain(request).get('id')
+    return None if domain_id == DEFAULT_DOMAIN else domain_id
+
+
+def is_cloud_admin(request):
+    return policy.check((("identity", "cloud_admin"),), request)
 
 
 # TODO(gabriel): Is there ever a valid case for admin to be false here?
@@ -254,6 +304,7 @@ def tenant_delete(request, project):
     return manager.delete(project)
 
 
+# NOTE(esp): domain is really domain_id
 def tenant_list(request, paginate=False, marker=None, domain=None, user=None,
                 admin=True, filters=None):
     manager = VERSIONS.get_project_manager(request, admin=admin)
@@ -275,15 +326,17 @@ def tenant_list(request, paginate=False, marker=None, domain=None, user=None,
         if paginate and len(tenants) > page_size:
             tenants.pop(-1)
             has_more_data = True
+    # V3 API
     else:
+        domain_id = get_effective_domain_id(request)
         kwargs = {
-            "domain": domain,
+            "domain": domain_id,
             "user": user
         }
         if filters is not None:
             kwargs.update(filters)
         tenants = manager.list(**kwargs)
-    return (tenants, has_more_data)
+    return tenants, has_more_data
 
 
 def tenant_update(request, project, name=None, description=None,
@@ -292,8 +345,9 @@ def tenant_update(request, project, name=None, description=None,
     if VERSIONS.active < 3:
         return manager.update(project, name, description, enabled, **kwargs)
     else:
-        return manager.update(project, name=name, description=description,
-                              enabled=enabled, domain=domain, **kwargs)
+        return manager.update(project, name=name, domain=domain,
+                              description=description,
+                              enabled=enabled, **kwargs)
 
 
 def user_list(request, project=None, domain=None, group=None, filters=None):
@@ -502,25 +556,42 @@ def get_project_groups_roles(request, project):
 
     """
     groups_roles = collections.defaultdict(list)
-    project_role_assignments = role_assignments_list(request,
-                                                     project=project)
+
+    if VERSIONS.active < 3:
+        project_role_assignments = role_assignments_list(
+            request, project=project)
+    else:
+        project_role_assignments = role_assignments_list(request)
+
     for role_assignment in project_role_assignments:
         if not hasattr(role_assignment, 'group'):
             continue
         group_id = role_assignment.group['id']
         role_id = role_assignment.role['id']
+        # TODO(esp): may need to filter this list by project or domain
         groups_roles[group_id].append(role_id)
     return groups_roles
 
 
 def role_assignments_list(request, project=None, user=None, role=None,
-                          group=None, domain=None, effective=False):
+                          group=None, domain=None, effective=False,
+                          include_subtree=True):
     if VERSIONS.active < 3:
         raise exceptions.NotAvailable
 
+    # Domain Admin needs this
+    if domain is None:
+        default_domain = get_default_domain(request)
+        domain = default_domain.get('id')
+
+    if is_cloud_admin(request):
+        domain = None
+
     manager = keystoneclient(request, admin=True).role_assignments
+
     return manager.list(project=project, user=user, role=role, group=group,
-                        domain=domain, effective=effective)
+                        domain=domain, effective=effective,
+                        include_subtree=include_subtree)
 
 
 def role_create(request, name):
@@ -566,7 +637,11 @@ def get_domain_users_roles(request, domain):
             continue
         user_id = role_assignment.user['id']
         role_id = role_assignment.role['id']
-        users_roles[user_id].append(role_id)
+
+        # filter by domain_id
+        if ('domain' in role_assignment.scope and
+                role_assignment.scope['domain']['id'] == domain):
+            users_roles[user_id].append(role_id)
     return users_roles
 
 
@@ -592,14 +667,17 @@ def get_project_users_roles(request, project):
             roles_ids = [role.id for role in roles]
             users_roles[user.id].extend(roles_ids)
     else:
-        project_role_assignments = role_assignments_list(request,
-                                                         project=project)
+        project_role_assignments = role_assignments_list(request)
         for role_assignment in project_role_assignments:
             if not hasattr(role_assignment, 'user'):
                 continue
             user_id = role_assignment.user['id']
             role_id = role_assignment.role['id']
-            users_roles[user_id].append(role_id)
+
+            # filter by project_id
+            if ('project' in role_assignment.scope and
+                    role_assignment.scope['project']['id'] == project):
+                    users_roles[user_id].append(role_id)
     return users_roles
 
 

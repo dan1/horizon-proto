@@ -190,16 +190,23 @@ class ProjectAggregatesQuery(object):
         self.request = request
         self.period = period
         self.additional_query = additional_query
+
+        domain = api.keystone.get_default_domain(request)
+        domain_id = domain.get('id')
+
+        # Cloud Admin - list all projects
+        if domain_id == api.keystone.DEFAULT_DOMAIN:
+            domain_id = None
+
         tenants, more = api.keystone.tenant_list(request,
-                                                 domain=None,
+                                                 domain=domain_id,
                                                  paginate=False)
         self.queries = {}
 
         for tenant in tenants:
-            tenant_query = [{
-                            "field": "project_id",
-                            "op": "eq",
-                            "value": tenant.id}]
+            tenant_query = [{"field": "project_id",
+                             "op": "eq",
+                             "value": tenant.id}]
 
             self.queries[tenant.name] = tenant_query
 

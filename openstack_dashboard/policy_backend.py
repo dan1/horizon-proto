@@ -118,9 +118,19 @@ def check(actions, request, target=None):
     # same for user_id
     if target.get('user_id') is None:
         target['user_id'] = user.id
-    # same for domain_id
-    if target.get('domain_id') is None:
-        target['domain_id'] = user.domain_id
+    # same for these:
+    domain_id_keys = [
+        'domain_id',
+        'project.domain_id',
+        'user.domain_id',
+        'group.domain_id',
+        'target.group.domain_id',
+        'target.project.domain_id',
+        'target.user.domain_id',
+    ]
+    for key in domain_id_keys:
+        if target.get(key) is None:
+            target[key] = user.user_domain_id
 
     credentials = _user_to_credentials(request, user)
 

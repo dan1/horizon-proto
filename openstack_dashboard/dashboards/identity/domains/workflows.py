@@ -482,7 +482,7 @@ class UpdateDomain(workflows.Workflow):
         try:
             LOG.info('Updating domain with name "%s"' % data['name'])
             api.keystone.domain_update(request,
-                                       domain_id=domain_id,
+                                       domain_id,
                                        name=data['name'],
                                        description=data['description'],
                                        enabled=data['enabled'])

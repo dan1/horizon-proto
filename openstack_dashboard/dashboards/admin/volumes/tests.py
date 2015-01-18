@@ -26,7 +26,8 @@ class VolumeTests(test.BaseAdminViewTests):
     @test.create_stubs({api.nova: ('server_list',),
                         cinder: ('volume_list',
                                  'volume_snapshot_list'),
-                        keystone: ('tenant_list',)})
+                        keystone: ('tenant_list',
+                                   'get_effective_domain_id')})
     def test_index(self):
         cinder.volume_list(IsA(http.HttpRequest), search_opts={
             'all_tenants': True}).AndReturn(self.cinder_volumes.list())
@@ -35,8 +36,9 @@ class VolumeTests(test.BaseAdminViewTests):
         api.nova.server_list(IsA(http.HttpRequest), search_opts={
                              'all_tenants': True}) \
             .AndReturn([self.servers.list(), False])
-        keystone.tenant_list(IsA(http.HttpRequest)) \
-            .AndReturn([self.tenants.list(), False])
+
+        keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([self.tenants.list(), False])
 
         self.mox.ReplayAll()
         res = self.client.get(reverse('horizon:admin:volumes:index'))
@@ -77,7 +79,8 @@ class VolumeTests(test.BaseAdminViewTests):
 
     @test.create_stubs({cinder: ('volume_list',
                                  'volume_snapshot_list',),
-                        keystone: ('tenant_list',)})
+                        keystone: ('tenant_list',
+                                   'get_effective_domain_id')})
     def test_snapshots_tab(self):
         cinder.volume_snapshot_list(IsA(http.HttpRequest), search_opts={
             'all_tenants': True}). \
@@ -85,8 +88,9 @@ class VolumeTests(test.BaseAdminViewTests):
         cinder.volume_list(IsA(http.HttpRequest), search_opts={
             'all_tenants': True}).\
             AndReturn(self.cinder_volumes.list())
-        keystone.tenant_list(IsA(http.HttpRequest)). \
-            AndReturn([self.tenants.list(), False])
+
+        keystone.tenant_list(
+            IsA(http.HttpRequest)).AndReturn([self.tenants.list(), False])
 
         self.mox.ReplayAll()
         res = self.client.get(reverse('horizon:admin:volumes:snapshots_tab'))
