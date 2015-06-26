@@ -17,6 +17,7 @@ import logging
 import os.path
 
 from django.conf import settings
+from openstack_auth import user as auth_user
 from openstack_auth import utils as auth_utils
 from oslo_config import cfg
 
@@ -132,7 +133,8 @@ def check(actions, request, target=None):
         if target.get(key) is None:
             target[key] = user.user_domain_id
 
-    credentials = _user_to_credentials(request, user)
+    credentials = _user_to_credentials(user)
+    domain_creds = _domain_to_credentials(request)
 
     enforcer = _get_enforcer()
 
@@ -140,25 +142,36 @@ def check(actions, request, target=None):
         scope, action = action[0], action[1]
         if scope in enforcer:
             # if any check fails return failure
-            if not enforcer[scope].enforce(action, target, credentials):
-                # to match service implementations, if a rule is not found,
-                # use the default rule for that service policy
-                #
-                # waiting to make the check because the first call to
-                # enforce loads the rules
-                if action not in enforcer[scope].rules:
-                    if not enforcer[scope].enforce('default',
-                                                   target, credentials):
-                        return False
-                else:
-                    return False
+            if scope == 'identity' and domain_creds:
+                return _check_credentials(
+                    enforcer[scope], action, target, domain_creds)
+            else:
+                return _check_credentials(
+                    enforcer[scope], action, target, credentials)
+
         # if no policy for scope, allow action, underlying API will
         # ultimately block the action if not permitted, treat as though
         # allowed
     return True
 
 
-def _user_to_credentials(request, user):
+def _check_credentials(enforcer_scope, action, target, credentials):
+    is_valid = True
+    if not enforcer_scope.enforce(action, target, credentials):
+        # to match service implementations, if a rule is not found,
+        # use the default rule for that service policy
+        #
+        # waiting to make the check because the first call to
+        # enforce loads the rules
+        if action not in enforcer_scope.rules:
+            if not enforcer_scope.enforce('default', target, credentials):
+                is_valid = False
+        else:
+            is_valid = False
+    return is_valid
+
+
+def _user_to_credentials(user):
     if not hasattr(user, "_credentials"):
         roles = [role['name'] for role in user.roles]
         user._credentials = {'user_id': user.id,
@@ -170,3 +183,21 @@ def _user_to_credentials(request, user):
                              'is_admin': user.is_superuser,
                              'roles': roles}
     return user._credentials
+
+
+def _domain_to_credentials(request):
+    interface = getattr(settings, 'OPENSTACK_ENDPOINT_TYPE', 'public')
+    try:
+        domain_auth_ref = request.session.get('domain_token')
+        # no domain token (aka member)
+        if not domain_auth_ref:
+            return None
+
+        domain_user = auth_user.create_user_from_token(
+            request, auth_user.Token(domain_auth_ref),
+            domain_auth_ref.service_catalog.url_for(endpoint_type=interface))
+    except Exception:
+        LOG.error("Failed to create user from domain scoped token.")
+        return None
+
+    return _user_to_credentials(domain_user)

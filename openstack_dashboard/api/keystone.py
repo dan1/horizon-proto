@@ -121,7 +121,7 @@ def _get_endpoint_url(request, endpoint_type, catalog=None):
     return url
 
 
-def keystoneclient(request, admin=False, use_project_token=False):
+def keystoneclient(request, admin=False):
     """Returns a client connected to the Keystone backend.
 
     Several forms of authentication are supported:
@@ -147,7 +147,7 @@ def keystoneclient(request, admin=False, use_project_token=False):
     user = request.user
     token_id = user.token.id
 
-    if api_version >= 3 and not use_project_token:
+    if api_version >= 3:
         domain_token = request.session.get('domain_token')
         if domain_token:
             token_id = getattr(domain_token, 'auth_token', None)
@@ -276,11 +276,6 @@ def get_effective_domain_id(request):
     Many keystone calls need this type of behavior to deal with hierarchical
     domain structures.
     """
-
-    # TODO(woodm1979): This assumes there's one-level of sub-domains with a
-    # single super-domain to rule them all.  A different solution will be
-    # needed once the whole hierarchical domains + hierarchical projects
-    # picture shakes out.
 
     domain_id = get_default_domain(request).get('id')
     return None if domain_id == DEFAULT_DOMAIN else domain_id
