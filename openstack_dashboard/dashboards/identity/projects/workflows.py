@@ -178,7 +178,7 @@ class CreateProjectInfoAction(workflows.Action):
         # for the keystone.v2 is omitted
         try:
             if keystone.VERSIONS.active >= 3:
-                tenant = api.keystone.tenant_list(
+                tenant, more = api.keystone.tenant_list(
                     self.request,
                     domain=domain_id,
                     filters={'name': project_name})

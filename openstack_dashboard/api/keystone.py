@@ -36,7 +36,6 @@ from horizon.utils import functions as utils
 from openstack_dashboard.api import base
 from openstack_dashboard import policy
 
-
 LOG = logging.getLogger(__name__)
 DEFAULT_ROLE = None
 DEFAULT_DOMAIN = getattr(settings, 'OPENSTACK_KEYSTONE_DEFAULT_DOMAIN', None)
@@ -147,10 +146,12 @@ def keystoneclient(request, admin=False):
     user = request.user
     token_id = user.token.id
 
-    if api_version >= 3:
-        domain_token = request.session.get('domain_token')
-        if domain_token:
-            token_id = getattr(domain_token, 'auth_token', None)
+    if is_multi_domain_enabled:
+        # Cloud Admin, Domain Admin or Mixed Domain Admin
+        if is_domain_admin(request) or is_domain_and_project_admin(request):
+            domain_token = request.session.get('domain_token')
+            if domain_token:
+                token_id = getattr(domain_token, 'auth_token', None)
 
     if admin:
         if not policy.check((("identity", "admin_required"),), request):
@@ -283,6 +284,21 @@ def get_effective_domain_id(request):
 
 def is_cloud_admin(request):
     return policy.check((("identity", "cloud_admin"),), request)
+
+
+def is_domain_admin(request):
+    # TODO(btully): check this to verify that domain id is in scope vs target
+    return policy.check(
+        (("identity", "admin_and_matching_domain_id"),), request)
+
+
+def is_project_admin(request):
+    return policy.check(
+        (("identity", "admin_and_matching_target_project_id"),), request)
+
+
+def is_domain_and_project_admin(request):
+    return is_project_admin(request) and is_domain_admin(request)
 
 
 # TODO(gabriel): Is there ever a valid case for admin to be false here?
@@ -814,5 +830,6 @@ def keystone_backend_name():
         return 'unknown'
 
 
-def get_version():
-    return VERSIONS.active
+def is_multi_domain_enabled():
+    return (VERSIONS.active >= 3 and
+            getattr(settings, 'OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT', False))

@@ -760,7 +760,7 @@ class CreateProjectWorkflowTests(test.BaseAdminViewTests):
         api.keystone.tenant_list(IgnoreArg(),
                                  domain=domain_id,
                                  filters={"name": project.name})\
-            .AndReturn(project)
+            .AndReturn((project, False))
 
         api.keystone.get_default_domain(IsA(http.HttpRequest)) \
             .AndReturn(default_domain)
