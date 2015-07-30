@@ -117,7 +117,8 @@ class IndexView(tables.DataTableView):
                     paginate=True,
                     marker=marker,
                     admin=False)
-            except Exception:
+            except Exception as e:
+                print e
                 exceptions.handle(self.request,
                                   _("Unable to retrieve project information."))
         else:
@@ -226,6 +227,11 @@ class UpdateProjectView(workflows.WorkflowView):
             # TODO(esp): we may not have a project token (pure Domain Admin)
             # get initial project quota
             if keystone.is_cloud_admin(self.request):
+
+                ############################################################
+                # TODO(esp): if we didn't persist the user + domain token
+                # this should work for Cloud Admin
+                ############################################################
                 quota_data = quotas.get_tenant_quota_data(self.request,
                                                           tenant_id=project_id)
 

@@ -30,13 +30,17 @@ class Users(horizon.Panel):
     policy_rules = (("identity", "identity:get_user"),
                     ("identity", "identity:list_users"))
 
-    def can_access(self, context):
-        if (keystone.VERSIONS.active < 3 or
-                not keystone.is_multi_domain_enabled()):
-            return super(Users, self).can_access(context)
+    ######################################################
+    # TODO(esp): not needed cuz there is no domain_token
+    ######################################################
 
-        request = context['request']
-        domain_token = request.session.get('domain_token')
-        return super(Users, self).can_access(context) and domain_token
+    # def can_access(self, context):
+    #     if (keystone.VERSIONS.active < 3 or
+    #             not keystone.is_multi_domain_enabled()):
+    #         return super(Users, self).can_access(context)
+    #
+    #     request = context['request']
+    #     domain_token = request.session.get('domain_token')
+    #     return super(Users, self).can_access(context) and domain_token
 
 dashboard.Identity.register(Users)

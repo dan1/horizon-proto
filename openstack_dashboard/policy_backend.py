@@ -15,9 +15,11 @@
 
 import logging
 import os.path
-
+########################################################################
+# TODO(esp): this is temporary should use auth_utils
+########################################################################
+from api import keystone
 from django.conf import settings
-from openstack_auth import user as auth_user
 from openstack_auth import utils as auth_utils
 from oslo_config import cfg
 
@@ -134,7 +136,12 @@ def check(actions, request, target=None):
             target[key] = user.user_domain_id
 
     credentials = _user_to_credentials(user)
-    domain_creds = _domain_to_credentials(request)
+
+    ###################################################
+    # TODO(esp): This will check way too often
+    # domain_creds = _domain_to_credentials(request)
+    ###################################################
+    domain_creds = None
 
     enforcer = _get_enforcer()
 
@@ -184,20 +191,9 @@ def _user_to_credentials(user):
                              'roles': roles}
     return user._credentials
 
-
+###################################################################
+# TODO(esp): we can just grab a new token each time (stateless)
+###################################################################
 def _domain_to_credentials(request):
-    interface = getattr(settings, 'OPENSTACK_ENDPOINT_TYPE', 'public')
-    try:
-        domain_auth_ref = request.session.get('domain_token')
-        # no domain token (aka member)
-        if not domain_auth_ref:
-            return None
-
-        domain_user = auth_user.create_user_from_token(
-            request, auth_user.Token(domain_auth_ref),
-            domain_auth_ref.service_catalog.url_for(endpoint_type=interface))
-    except Exception:
-        LOG.error("Failed to create user from domain scoped token.")
-        return None
-
+    domain_user = keystone.get_domain_user(request)
     return _user_to_credentials(domain_user)

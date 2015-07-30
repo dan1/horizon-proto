@@ -27,6 +27,7 @@ import six.moves.urllib.parse as urlparse
 from keystoneclient import exceptions as keystone_exceptions
 
 from openstack_auth import backend
+from openstack_auth import user as auth_user
 from openstack_auth import utils as auth_utils
 
 from horizon import exceptions
@@ -119,6 +120,33 @@ def _get_endpoint_url(request, endpoint_type, catalog=None):
 
     return url
 
+######################################################################
+# TODO(esp): This probably belongs is doa utils
+######################################################################
+
+def get_domain_user(request):
+    endpoint = auth_utils.fix_auth_url_version(request.user.endpoint)
+    unscoped_token = request.user.unscoped_token
+    domain_name = request.user.user_domain_name
+    session = auth_utils.get_session()
+    interface = getattr(settings, 'OPENSTACK_ENDPOINT_TYPE', 'public')
+    user = None
+    try:
+        auth = auth_utils.get_token_auth_plugin(auth_url=endpoint,
+                                                token=unscoped_token,
+                                                domain_name=domain_name)
+        domain_auth_ref = auth.get_access(session)
+        user = auth_user.create_user_from_token(
+            request,
+            auth_user.Token(domain_auth_ref, unscoped_token=unscoped_token),
+            domain_auth_ref.service_catalog.url_for(endpoint_type=interface))
+
+    except Exception:
+        LOG.error("Failed to create user from domain scoped token.")
+
+    print "get_domain_user(request) called!!!"
+    return user
+
 
 def keystoneclient(request, admin=False):
     """Returns a client connected to the Keystone backend.
@@ -146,12 +174,20 @@ def keystoneclient(request, admin=False):
     user = request.user
     token_id = user.token.id
 
-    if is_multi_domain_enabled:
-        # Cloud Admin, Domain Admin or Mixed Domain Admin
-        if is_domain_admin(request) or is_domain_and_project_admin(request):
-            domain_token = request.session.get('domain_token')
-            if domain_token:
-                token_id = getattr(domain_token, 'auth_token', None)
+    ######################################################
+    # Rescope for each call to keystone
+    ######################################################
+
+    # checks v3 and multi domain = true
+    if is_multi_domain_enabled():
+        domain_user = get_domain_user(request)
+
+        ####################################################
+        # You only need this if you are cloud/domain admin
+        # Members will use a project token
+        ####################################################
+        if domain_user:
+            token_id = domain_user.token.id
 
     if admin:
         if not policy.check((("identity", "admin_required"),), request):
