@@ -17,7 +17,9 @@ DEFAULT = False
 # A dictionary of exception classes to be added to HORIZON['exceptions'].
 ADD_EXCEPTIONS = {}
 # A list of applications to be added to INSTALLED_APPS.
-ADD_INSTALLED_APPS = ['openstack_dashboard.dashboards.identity']
+# ADD_INSTALLED_APPS = ['openstack_dashboard.dashboards.identity']
+
+ADD_INSTALLED_APPS = ['openstack_dashboard.contrib.identity']
 
 ADD_ANGULAR_MODULES = [
     'hz.dashboard.identity',

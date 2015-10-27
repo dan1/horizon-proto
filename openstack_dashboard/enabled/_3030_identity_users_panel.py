@@ -6,4 +6,5 @@ PANEL_GROUP = 'default'
 PANEL_DASHBOARD = 'identity'
 
 # Python panel class of the PANEL to be added.
-ADD_PANEL = 'openstack_dashboard.dashboards.identity.users.panel.Users'
+# ADD_PANEL = 'openstack_dashboard.dashboards.identity.users.panel.Users'
+ADD_PANEL = 'openstack_dashboard.contrib.identity.users.panel.Users'

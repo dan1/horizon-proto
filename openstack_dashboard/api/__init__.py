@@ -31,13 +31,24 @@ In other words, Horizon developers not working on openstack_dashboard.api
 shouldn't need to understand the finer details of APIs for
 Keystone/Nova/Glance/Swift et. al.
 """
+from django.conf import settings
+
+api_versions = getattr(settings, 'OPENSTACK_API_VERSIONS', {'identity', 2.0, })
+multi_domain = getattr(
+    settings, 'OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT', False)
+
 from openstack_dashboard.api import base
 from openstack_dashboard.api import ceilometer
 from openstack_dashboard.api import cinder
 from openstack_dashboard.api import fwaas
 from openstack_dashboard.api import glance
 from openstack_dashboard.api import heat
-from openstack_dashboard.api import keystone
+
+if api_versions >= 3 and multi_domain:
+    from openstack_dashboard.api import keystone_v3 as keystone
+else:
+    from openstack_dashboard.api import keystone
+
 from openstack_dashboard.api import lbaas
 from openstack_dashboard.api import network
 from openstack_dashboard.api import neutron
@@ -54,6 +65,7 @@ __all__ = [
     "glance",
     "heat",
     "keystone",
+    "keystone_v3",
     "lbaas",
     "network",
     "neutron",
